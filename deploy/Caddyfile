@@ -1,0 +1,29 @@
+{
+    email {$ACME_EMAIL}
+}
+
+{$DEVICEPILOT_DOMAIN} {
+    @public_health path /healthz
+    handle @public_health {
+        respond "ok" 200
+    }
+
+    handle {
+        basic_auth {
+            {$BASIC_AUTH_USERNAME} {$BASIC_AUTH_PASSWORD_HASH}
+        }
+        header {
+            Strict-Transport-Security "max-age=31536000"
+            X-Content-Type-Options "nosniff"
+            X-Frame-Options "DENY"
+            Referrer-Policy "strict-origin-when-cross-origin"
+            Content-Security-Policy "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; object-src 'none'"
+        }
+        reverse_proxy frontend:80 {
+            header_up -Authorization
+            header_up X-Forwarded-For {http.request.remote.host}
+            header_up X-Forwarded-Proto {http.request.scheme}
+            header_up X-Real-IP {http.request.remote.host}
+        }
+    }
+}

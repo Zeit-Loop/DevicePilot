@@ -1,0 +1,52 @@
+services:
+  backend:
+    build:
+      context: .
+    environment:
+      DATABASE_URL: sqlite:////data/devicepilot.db
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_API_BASE: ${LLM_API_BASE:-}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-20}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      DIAGNOSIS_RATE_LIMIT_PER_MINUTE: ${DIAGNOSIS_RATE_LIMIT_PER_MINUTE:-5}
+      TRUST_PROXY_HEADERS: "true"
+      AUTO_SEED_DEMO: "true"
+      RAG_ENABLED: ${RAG_ENABLED:-false}
+      RAG_KNOWLEDGE_PATH: /app/knowledge
+      RAG_VECTOR_STORE_PATH: /data/chroma
+      RAG_COLLECTION_NAME: ${RAG_COLLECTION_NAME:-devicepilot_knowledge}
+      RAG_EMBEDDING_MODEL: ${RAG_EMBEDDING_MODEL:-intfloat/multilingual-e5-small}
+      RAG_TOP_K: ${RAG_TOP_K:-3}
+      RAG_MAX_DISTANCE: ${RAG_MAX_DISTANCE:-0.143}
+      RAG_CHUNK_SIZE: ${RAG_CHUNK_SIZE:-600}
+      RAG_CHUNK_OVERLAP: ${RAG_CHUNK_OVERLAP:-80}
+      RAG_MAX_FILE_BYTES: ${RAG_MAX_FILE_BYTES:-1000000}
+    volumes:
+      - devicepilot_data:/data
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/openapi.json')"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+volumes:
+  devicepilot_data:

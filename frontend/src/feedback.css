@@ -1,0 +1,23 @@
+.inline-warning {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid #f2d49a;
+  border-radius: 10px;
+  background: #fff8e8;
+  color: #8a5a08;
+  font-size: 13px;
+}
+
+.inline-warning svg {
+  width: 18px;
+  flex: none;
+}
+
+.inline-warning.danger {
+  border-color: #f1b7bd;
+  background: #fff0f1;
+  color: #a92f3c;
+}

@@ -1,0 +1,107 @@
+services:
+  caddy:
+    image: caddy:2.11.4-alpine
+    env_file:
+      - ${CADDY_ENV_FILE:-/etc/devicepilot/caddy.env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - edge
+    depends_on:
+      frontend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:2019/config/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    logging: &bounded_logging
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend:
+    build:
+      context: ./frontend
+    image: devicepilot-frontend:${APP_VERSION:?set APP_VERSION}
+    networks:
+      - edge
+      - app
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    logging: *bounded_logging
+
+  backend:
+    build:
+      context: .
+    image: devicepilot-backend:${APP_VERSION:?set APP_VERSION}
+    env_file:
+      - ${BACKEND_ENV_FILE:-/etc/devicepilot/backend.env}
+    environment:
+      APP_ENV: production
+      DATABASE_URL: sqlite:////data/devicepilot.db
+      TRUST_PROXY_HEADERS: "true"
+      AUTO_SEED_DEMO: "false"
+      RAG_KNOWLEDGE_PATH: /app/knowledge
+      RAG_VECTOR_STORE_PATH: /data/chroma
+    user: "10001:10001"
+    volumes:
+      - devicepilot_data:/data
+    networks:
+      - app
+      - egress
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    restart: unless-stopped
+    logging: *bounded_logging
+
+  backup:
+    image: devicepilot-backend:${APP_VERSION:?set APP_VERSION}
+    profiles: [maintenance]
+    user: "10001:10001"
+    command: ["python", "-m", "scripts.backup_sqlite", "--source", "/data/devicepilot.db", "--destination", "/backups"]
+    volumes:
+      - devicepilot_data:/data:ro
+      - ${BACKUP_DIR:-/var/backups/devicepilot}:/backups
+    networks:
+      - app
+    restart: "no"
+    logging: *bounded_logging
+
+networks:
+  edge:
+  app:
+    internal: true
+  egress:
+
+volumes:
+  devicepilot_data:
+    name: devicepilot_data
+  caddy_data:
+  caddy_config:
