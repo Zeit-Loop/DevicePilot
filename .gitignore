@@ -21,3 +21,7 @@ htmlcov/
 .DS_Store
 Thumbs.db
 .tmp*/
+
+# Local agent configuration
+/.codex/
+/AGENTS.md
